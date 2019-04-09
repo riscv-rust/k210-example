@@ -4,6 +4,17 @@
 
 This project is developed and maintained by the [RISC-V team][team].
 
+## Getting started
+
+Start openocd:
+
+    openocd -f dp_busblaster.cfg -f openocd.cfg
+
+Run the example:
+
+    cargo run
+
+
 ## License
 
 Copyright 2019 [RISC-V team][team]
