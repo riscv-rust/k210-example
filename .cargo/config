@@ -1,5 +1,6 @@
 [target.riscv64imac-unknown-none-elf]
 runner = "riscv64-unknown-elf-gdb -x gdb_init"
+#runner = "../k210-run"
 rustflags = [
   "-C", "link-arg=-Tmemory.x",
   "-C", "link-arg=-Tlink.x",
