@@ -69,7 +69,7 @@ fn main() -> ! {
         let clocks = k210_hal::clock::Clocks::new();
 
         // Configure UART
-        let serial = p.UARTHS.constrain(115_200.bps(), &clocks);
+        let serial = p.UARTHS.configure(115_200.bps(), &clocks);
         let (tx, _) = serial.split();
 
         unsafe {
