@@ -1,4 +1,8 @@
-[target.riscv64imac-unknown-none-elf]
+# According to Section 3.1, Kendryte K210 Datasheet,
+# K210 chip has two RV64IMAFDC (RV64GC) cores.
+# We need `riscv64gc` targets for this chip.
+
+[target.riscv64gc-unknown-none-elf]
 #runner = "riscv64-unknown-elf-gdb -x gdb_init"
 runner = "../k210-run --flash"
 rustflags = [
@@ -7,4 +11,4 @@ rustflags = [
 ]
 
 [build]
-target = "riscv64imac-unknown-none-elf"
+target = "riscv64gc-unknown-none-elf"
