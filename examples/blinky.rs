@@ -11,16 +11,17 @@ fn main() -> ! {
     let fpioa = p.FPIOA.split();
     let io14 = fpioa.io14.into_function(fpioa::GPIO6);
 
-    // Configure clocks (TODO)
-    let clocks = k210_hal::clock::Clocks::new();
-
     let gpio = p.GPIO.split();
     let mut gpio6 = Gpio::new(gpio.gpio6, io14).into_push_pull_output();
 
     gpio6.set_low().ok();
 
+    let mut last_update = riscv::register::mcycle::read();;
     loop {
-        // gpio6.toggle().ok();
-        unsafe { riscv::asm::wfi() }
+        let cur = riscv::register::mcycle::read();;
+        if cur - last_update >= 40_000_000 {
+            last_update = cur;
+            gpio6.toggle().ok();
+        }
     }
 }
