@@ -9,7 +9,7 @@ fn main() -> ! {
     let p = pac::Peripherals::take().unwrap();
     
     let fpioa = p.FPIOA.split();
-    let io14 = fpioa.io14.into_function(fpioa::Gpio6);
+    let io14 = fpioa.io14.into_function(fpioa::GPIO6);
 
     // Configure clocks (TODO)
     let clocks = k210_hal::clock::Clocks::new();
@@ -19,5 +19,8 @@ fn main() -> ! {
 
     gpio6.set_low().ok();
 
-    loop {}
+    loop {
+        // gpio6.toggle().ok();
+        unsafe { riscv::asm::wfi() }
+    }
 }

@@ -14,9 +14,7 @@ fn main() -> ! {
 
     // Prepare pins for UARTHS
     let fpioa = p.FPIOA.split();
-    // let tx = p.pins.pin5;
-    let _io5 = fpioa.io5.into_function(fpioa::UarthsTx);
-    // let rx = p.pins.pin4;
+    let _io5 = fpioa.io5.into_function(fpioa::UARTHS_TX);
 
     // Configure clocks (TODO)
     let clocks = k210_hal::clock::Clocks::new();
