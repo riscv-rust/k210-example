@@ -11,9 +11,9 @@ use k210_hal::stdout::Stdout;
 #[riscv_rt::entry]
 fn main() -> ! {
     let p = pac::Peripherals::take().unwrap();
-
+    let sysctl = p.SYSCTL.constrain();
     // Prepare pins for UARTHS
-    let fpioa = p.FPIOA.split();
+    let fpioa = p.FPIOA.split(&mut sysctl.apb0);
     let _io5 = fpioa.io5.into_function(fpioa::UARTHS_TX);
 
     // Configure clocks (TODO)
