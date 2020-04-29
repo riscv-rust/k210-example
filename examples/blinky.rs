@@ -16,9 +16,9 @@ fn main() -> ! {
 
     blue.set_low().ok();
 
-    let mut last_update = riscv::register::mcycle::read();;
+    let mut last_update = riscv::register::mcycle::read();
     loop {
-        let cur = riscv::register::mcycle::read();;
+        let cur = riscv::register::mcycle::read();
         if cur - last_update >= 100_000_000 {
             last_update = cur;
 
