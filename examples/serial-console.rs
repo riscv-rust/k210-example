@@ -40,6 +40,8 @@ fn main() -> ! {
     writeln!(stdout, "Hello, Rust!").ok();
 
     loop {
-        writeln!(stdout, "Io16 input state: {}", boot_button.is_high().unwrap()).ok();
+        let input_state = boot_button.is_high().unwrap();
+        let dir = unsafe { &*pac::GPIO::ptr() }.direction.read().bits();
+        writeln!(stdout, "Io16 input: {}; direction value: 0x{:08X}", input_state, dir);
     }
 }
