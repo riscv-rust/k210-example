@@ -98,7 +98,7 @@ fn main() -> ! {
     }
     INTR.store(false, Ordering::SeqCst);
     writeln!(stdout, 
-        "Interrupt was triggered! hart_id: {}, cause: {}", 
+        "Interrupt was triggered! hart_id: {:16X}, cause: {:16X}", 
         unsafe { INTR_INFO }.unwrap().hart_id,
         unsafe { INTR_INFO }.unwrap().cause,
     ).unwrap();
