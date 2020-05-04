@@ -29,18 +29,22 @@ fn my_trap_handler() {
         mie::clear_mtimer();
     }
 
-    unsafe { 
-        &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().clear_bit());
-        &(*pac::GPIOHS::ptr()).rise_ip.write(|w| w.pin0().set_bit());
-        &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().set_bit());
+    // unsafe { 
+    //     &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().clear_bit());
+    //     &(*pac::GPIOHS::ptr()).rise_ip.write(|w| w.pin0().set_bit());
+    //     &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().set_bit());
     
-        &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().clear_bit());
-        &(*pac::GPIOHS::ptr()).fall_ip.write(|w| w.pin0().set_bit());
-        &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
-    }
+    //     &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().clear_bit());
+    //     &(*pac::GPIOHS::ptr()).fall_ip.write(|w| w.pin0().set_bit());
+    //     &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
+    // }
+    
 
     // actual handle process starts
     let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
+    let gpiohs0 = unsafe { &mut *GPIOHS0.as_mut_ptr() };
+    gpiohs0.clear_interrupt_pending_bits();
+    
     let cause = mcause::read().bits();
 
     writeln!(stdout, "Interrupt!!! {} {:016X}", hart_id, cause).unwrap();
@@ -60,6 +64,9 @@ fn my_trap_handler() {
 
 static mut SHARED_STDOUT: core::mem::MaybeUninit<
     k210_hal::stdout::Stdout<k210_hal::serial::Tx<pac::UARTHS>>
+> = core::mem::MaybeUninit::uninit();
+static mut GPIOHS0: core::mem::MaybeUninit<
+    k210_hal::gpiohs::Gpiohs0<k210_hal::gpiohs::Input<k210_hal::gpiohs::PullUp>>
 > = core::mem::MaybeUninit::uninit();
 
 #[riscv_rt::entry]
