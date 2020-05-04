@@ -29,22 +29,11 @@ fn my_trap_handler() {
         mie::clear_mtimer();
     }
 
-    // unsafe { 
-    //     &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().clear_bit());
-    //     &(*pac::GPIOHS::ptr()).rise_ip.write(|w| w.pin0().set_bit());
-    //     &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().set_bit());
-    
-    //     &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().clear_bit());
-    //     &(*pac::GPIOHS::ptr()).fall_ip.write(|w| w.pin0().set_bit());
-    //     &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
-    // }
-    
-
     // actual handle process starts
     let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
     let gpiohs0 = unsafe { &mut *GPIOHS0.as_mut_ptr() };
     gpiohs0.clear_interrupt_pending_bits();
-    
+
     let cause = mcause::read().bits();
 
     writeln!(stdout, "Interrupt!!! {} {:016X}", hart_id, cause).unwrap();
