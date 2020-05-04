@@ -64,8 +64,6 @@ static mut SHARED_STDOUT: core::mem::MaybeUninit<
 
 #[riscv_rt::entry]
 fn main() -> ! {
-    let hart_id = mhartid::read();
-
     let p = pac::Peripherals::take().unwrap();
 
     let mut sysctl = p.SYSCTL.constrain();
@@ -86,6 +84,7 @@ fn main() -> ! {
     writeln!(stdout, "This code is running on hart {}", mhartid::read()).unwrap();
 
     writeln!(stdout, "Initializing interrupts").unwrap();
+    let hart_id = mhartid::read();
     unsafe {
         // set PLIC threshold for current core
         pac::PLIC::set_threshold(hart_id, Priority::P0);
@@ -101,32 +100,9 @@ fn main() -> ! {
     // enable IRQ for gpiohs0 interrupt 
     writeln!(stdout, "Enabling IRQ for GPIOHS0").unwrap();
     unsafe {
-        // set_priority
         pac::PLIC::set_priority(Interrupt::GPIOHS0, Priority::P1);
-        // mask
-        pac::PLIC::enable(hart_id, Interrupt::GPIOHS0);
     }
-
-    // verify irq write 
-    // for irq_number in 1..=65 {
-    //     let enabled = unsafe {
-    //         &(*pac::PLIC::ptr()).target_enables[hart_id].enable[irq_number / 32]
-    //             .read().bits() & (1 << (irq_number % 32)) != 0
-    //     };
-    //     if !enabled { 
-    //         continue;
-    //     }
-    //     let priority = unsafe {
-    //         &(*pac::PLIC::ptr()).priority[irq_number].read().bits()
-    //     };
-    //     writeln!(stdout, 
-    //         "Irq: {}; Enabled: {}; Priority: {}", 
-    //         irq_number, enabled, priority
-    //     ).ok();
-    // }
-
-    // writeln!(stdout, "Generate IPI for core {} !", hart_id).unwrap();
-    // msip::set_value(hart_id, true);
+    pac::PLIC::enable(hart_id, Interrupt::GPIOHS0);
 
     writeln!(stdout, "Configuration finished!").unwrap();
 
