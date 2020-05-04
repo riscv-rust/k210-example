@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac, clint::msip, fpioa, stdout::Stdout, gpiohs::Gpiohs};
+use k210_hal::{prelude::*, pac, plic::*, fpioa, stdout::Stdout, gpiohs::Gpiohs};
 use panic_halt as _;
 use riscv::register::{mie,mstatus,mhartid,mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -18,28 +18,15 @@ static mut INTR_INFO: Option<IntrInfo> = None;
 
 #[export_name = "MachineExternal"]
 fn my_trap_handler() {
-    let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
-
     let hart_id = mhartid::read();
-    writeln!(stdout, "Interrupt 1!").unwrap();
-    // let ie_flag = mie::read().bits();
-    let irq_number = unsafe {
-        (*pac::PLIC::ptr()).targets[hart_id].claim.read().bits()
-    };
-    writeln!(stdout, "Interrupt 2 {}!", irq_number).unwrap();
-    let int_threshold = unsafe { 
-        (*pac::PLIC::ptr()).targets[hart_id].threshold.read().bits()
-    };
-    writeln!(stdout, "Interrupt 3 {}!", int_threshold).unwrap();
+    let threshold = pac::PLIC::get_threshold(hart_id);
+
+    let irq = pac::PLIC::claim(hart_id).unwrap();
+    let prio = pac::PLIC::get_priority(irq);
     unsafe { 
-        // not hart_id! it's irq_number!
-        let bits = (*pac::PLIC::ptr()).priority[irq_number as usize].read().bits();
-        (*pac::PLIC::ptr()).targets[hart_id].threshold.write(|w| 
-            w.bits(bits));
+        pac::PLIC::set_threshold(hart_id, prio);
         mie::clear_msoft();
         mie::clear_mtimer();
-        // mstatus::set_mie();
-        writeln!(stdout, "Interrupt 4 {}!", bits).unwrap();
     }
 
     unsafe { 
@@ -52,7 +39,8 @@ fn my_trap_handler() {
         &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
     }
 
-    // actual handle process
+    // actual handle process starts
+    let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
     let cause = mcause::read().bits();
 
     writeln!(stdout, "Interrupt!!! {} {:016X}", hart_id, cause).unwrap();
@@ -60,32 +48,14 @@ fn my_trap_handler() {
     unsafe { INTR_INFO = Some(IntrInfo { hart_id, cause }); }
 
     INTR.store(true, Ordering::SeqCst);
-
-    // msip::set_value(hart_id, false);
-    writeln!(stdout, "Interrupt 5!").unwrap();
+    // actual handle process ends
 
     unsafe { 
-        writeln!(stdout, "Interrupt 5.1! {}", irq_number).unwrap();
-        // complete
-        (*pac::PLIC::ptr()).targets[hart_id].claim.write(|w| w.bits(irq_number));
-        // writeln!(stdout, "Interrupt 5.2!").unwrap();
-        // mstatus::clear_mie();
-        writeln!(stdout, "Interrupt 5.3!").unwrap();
         mie::set_msoft();
-        writeln!(stdout, "Interrupt 5.4!").unwrap();
         mie::set_mtimer();
-        writeln!(stdout, "Interrupt 5.5!").unwrap();
+        pac::PLIC::set_threshold(hart_id, threshold);
     }
-    // let irq_number = unsafe {
-    //     (*pac::PLIC::ptr()).targets[hart_id].claim.read().bits()
-    // };
-    // writeln!(stdout, "Interrupt 5: claim: {}!", irq_number).unwrap();
-    writeln!(stdout, "Interrupt 6!").unwrap();
-    // mie::write(ie_flag);
-    unsafe { 
-        (*pac::PLIC::ptr()).targets[hart_id].threshold.write(|w| w.bits(int_threshold))
-    };
-    writeln!(stdout, "Interrupt 7!").unwrap();
+    pac::PLIC::complete(hart_id, irq);
 }
 
 static mut SHARED_STDOUT: core::mem::MaybeUninit<
@@ -119,44 +89,39 @@ fn main() -> ! {
 
     writeln!(stdout, "Initializing interrupts").unwrap();
     unsafe {
-        writeln!(stdout, "1").unwrap();
-        &(*pac::PLIC::ptr()).targets[hart_id].threshold.write(|w| w.bits(0));
-
+        // set PLIC threshold for current core
+        pac::PLIC::set_threshold(hart_id, Priority::P0);
         // Enable interrupts in general
-        writeln!(stdout, "2").unwrap();
         mstatus::set_mie();
         // // Set the Machine-Software bit in MIE
         // mie::set_msoft();
         // Set the Machine-External bit in MIE
-        writeln!(stdout, "3").unwrap();
         mie::set_mext();
     }
-    writeln!(stdout, "Initialize PLIC").unwrap();
-    for reg_id in 1..((65 + 32) / 32) {
-        unsafe { 
-            (*pac::PLIC::ptr()).target_enables[hart_id].enable[reg_id]
-                .write(|w| w.bits(0));
-        }
-    }
-    for irq_number in 1..=65 {
-        unsafe { 
-            (*pac::PLIC::ptr()).priority[irq_number]
-                .write(|w| w.bits(0));
-        }
-    }
-    unsafe {
-        (*pac::PLIC::ptr()).targets[hart_id].threshold
-            .write(|w| w.bits(0));
-    }
-    loop {
-        let complete = unsafe { 
-            (*pac::PLIC::ptr()).targets[hart_id].claim.read().bits()
-        };
-        writeln!(stdout, "Complete: {}", complete).ok();
-        if complete == 0 {
-            break;
-        }
-    }
+    // writeln!(stdout, "Initialize PLIC").unwrap();
+    // for reg_id in 1..((65 + 32) / 32) {
+    //     unsafe { 
+    //         (*pac::PLIC::ptr()).target_enables[hart_id].enable[reg_id]
+    //             .write(|w| w.bits(0));
+    //     }
+    // }
+    // for irq_number in 1..=65 {
+    //     unsafe { 
+    //         (*pac::PLIC::ptr()).priority[irq_number]
+    //             .write(|w| w.bits(0));
+    //     }
+    // }
+    // unsafe {
+    //     (*pac::PLIC::ptr()).targets[hart_id].threshold
+    //         .write(|w| w.bits(0));
+    // }
+    // loop {
+    //     let complete = pac::PLIC::claim(0);
+    //     writeln!(stdout, "Complete: {:?}", complete).ok();
+    //     if complete == None {
+    //         break;
+    //     }
+    // }
     // enable both edge interrupt trigger for gpiohs0
     writeln!(stdout, "Enabling interrupt trigger for GPIOHS0").unwrap();
     unsafe {
@@ -175,35 +140,29 @@ fn main() -> ! {
     // enable IRQ for gpiohs0 interrupt 
     writeln!(stdout, "Enabling IRQ for GPIOHS0").unwrap();
     unsafe {
-        const IRQN_GPIOHS0_INTERRUPT: usize = 34;
-        let irq_number = IRQN_GPIOHS0_INTERRUPT;
-        let priority = 1;
-        // should be 'modify'
-        writeln!(stdout, "1").unwrap();
-        &(*pac::PLIC::ptr()).priority[irq_number].write(|w| w.bits(priority));
-        writeln!(stdout, "2").unwrap();
-        &(*pac::PLIC::ptr()).target_enables[hart_id].enable[irq_number / 32]
-            .modify(|r, w| w.bits(r.bits() | 1 << (irq_number % 32)));
-        writeln!(stdout, "3").unwrap();
+        // set_priority
+        pac::PLIC::set_priority(Interrupt::GPIOHS0, Priority::P1);
+        // mask
+        pac::PLIC::enable(hart_id, Interrupt::GPIOHS0);
     }
 
     // verify irq write 
-    for irq_number in 1..=65 {
-        let enabled = unsafe {
-            &(*pac::PLIC::ptr()).target_enables[hart_id].enable[irq_number / 32]
-                .read().bits() & (1 << (irq_number % 32)) != 0
-        };
-        if !enabled { 
-            continue;
-        }
-        let priority = unsafe {
-            &(*pac::PLIC::ptr()).priority[irq_number].read().bits()
-        };
-        writeln!(stdout, 
-            "Irq: {}; Enabled: {}; Priority: {}", 
-            irq_number, enabled, priority
-        ).ok();
-    }
+    // for irq_number in 1..=65 {
+    //     let enabled = unsafe {
+    //         &(*pac::PLIC::ptr()).target_enables[hart_id].enable[irq_number / 32]
+    //             .read().bits() & (1 << (irq_number % 32)) != 0
+    //     };
+    //     if !enabled { 
+    //         continue;
+    //     }
+    //     let priority = unsafe {
+    //         &(*pac::PLIC::ptr()).priority[irq_number].read().bits()
+    //     };
+    //     writeln!(stdout, 
+    //         "Irq: {}; Enabled: {}; Priority: {}", 
+    //         irq_number, enabled, priority
+    //     ).ok();
+    // }
 
     // writeln!(stdout, "Generate IPI for core {} !", hart_id).unwrap();
     // msip::set_value(hart_id, true);
@@ -215,8 +174,8 @@ fn main() -> ! {
         unsafe { riscv::asm::wfi(); } 
 
         while !INTR.load(Ordering::SeqCst) {
-            // use core::sync::atomic::{self, Ordering};
-            // atomic::compiler_fence(Ordering::SeqCst);
+            use core::sync::atomic::{self, Ordering};
+            atomic::compiler_fence(Ordering::SeqCst);
         }
         INTR.store(false, Ordering::SeqCst);
 
