@@ -18,27 +18,43 @@ static mut INTR_INFO: Option<IntrInfo> = None;
 
 #[export_name = "MachineExternal"]
 fn my_trap_handler() {
+    let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
+
     let hart_id = mhartid::read();
+    writeln!(stdout, "Interrupt 1!").unwrap();
     // let ie_flag = mie::read().bits();
     let irq_number = unsafe {
         (*pac::PLIC::ptr()).targets[hart_id].claim.read().bits()
     };
+    writeln!(stdout, "Interrupt 2 {}!", irq_number).unwrap();
     let int_threshold = unsafe { 
         (*pac::PLIC::ptr()).targets[hart_id].threshold.read().bits()
     };
+    writeln!(stdout, "Interrupt 3 {}!", int_threshold).unwrap();
     unsafe { 
-        let bits = (*pac::PLIC::ptr()).priority[hart_id].read().bits();
+        // not hart_id! it's irq_number!
+        let bits = (*pac::PLIC::ptr()).priority[irq_number as usize].read().bits();
         (*pac::PLIC::ptr()).targets[hart_id].threshold.write(|w| 
             w.bits(bits));
         mie::clear_msoft();
         mie::clear_mtimer();
-        mstatus::set_mie();
+        // mstatus::set_mie();
+        writeln!(stdout, "Interrupt 4 {}!", bits).unwrap();
+    }
+
+    unsafe { 
+        &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().clear_bit());
+        &(*pac::GPIOHS::ptr()).rise_ip.write(|w| w.pin0().set_bit());
+        &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().set_bit());
+    
+        &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().clear_bit());
+        &(*pac::GPIOHS::ptr()).fall_ip.write(|w| w.pin0().set_bit());
+        &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
     }
 
     // actual handle process
     let cause = mcause::read().bits();
 
-    let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
     writeln!(stdout, "Interrupt!!! {} {:016X}", hart_id, cause).unwrap();
 
     unsafe { INTR_INFO = Some(IntrInfo { hart_id, cause }); }
@@ -46,18 +62,30 @@ fn my_trap_handler() {
     INTR.store(true, Ordering::SeqCst);
 
     // msip::set_value(hart_id, false);
+    writeln!(stdout, "Interrupt 5!").unwrap();
 
     unsafe { 
+        writeln!(stdout, "Interrupt 5.1! {}", irq_number).unwrap();
+        // complete
         (*pac::PLIC::ptr()).targets[hart_id].claim.write(|w| w.bits(irq_number));
-        mstatus::clear_mie();
+        // writeln!(stdout, "Interrupt 5.2!").unwrap();
+        // mstatus::clear_mie();
+        writeln!(stdout, "Interrupt 5.3!").unwrap();
         mie::set_msoft();
+        writeln!(stdout, "Interrupt 5.4!").unwrap();
         mie::set_mtimer();
+        writeln!(stdout, "Interrupt 5.5!").unwrap();
     }
+    // let irq_number = unsafe {
+    //     (*pac::PLIC::ptr()).targets[hart_id].claim.read().bits()
+    // };
+    // writeln!(stdout, "Interrupt 5: claim: {}!", irq_number).unwrap();
+    writeln!(stdout, "Interrupt 6!").unwrap();
     // mie::write(ie_flag);
     unsafe { 
         (*pac::PLIC::ptr()).targets[hart_id].threshold.write(|w| w.bits(int_threshold))
     };
-
+    writeln!(stdout, "Interrupt 7!").unwrap();
 }
 
 static mut SHARED_STDOUT: core::mem::MaybeUninit<
@@ -184,7 +212,7 @@ fn main() -> ! {
 
     loop { 
         writeln!(stdout, "Waiting for interrupt").unwrap();
-        // unsafe { riscv::asm::wfi(); } 
+        unsafe { riscv::asm::wfi(); } 
 
         while !INTR.load(Ordering::SeqCst) {
             // use core::sync::atomic::{self, Ordering};
