@@ -2,7 +2,7 @@
 #![no_main]
 
 use panic_halt as _;
-use k210_hal::{prelude::*, fpioa, pac, gpio::Gpio, gpiohs::Gpiohs, stdout::Stdout};
+use k210_hal::{prelude::*, fpioa, pac, gpio::Gpio, stdout::Stdout};
 
 #[riscv_rt::entry]
 fn main() -> ! {

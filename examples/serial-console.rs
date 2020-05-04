@@ -2,7 +2,7 @@
 #![no_main]
 
 use panic_halt as _;
-use k210_hal::{prelude::*, fpioa, pac, gpio::Gpio, gpiohs::Gpiohs, stdout::Stdout};
+use k210_hal::{prelude::*, fpioa, pac, gpio::Gpio, gpiohs, stdout::Stdout};
 
 #[riscv_rt::entry]
 fn main() -> ! {
@@ -18,14 +18,12 @@ fn main() -> ! {
 
     // prepare pins
     let _uarths_tx = fpioa.io5.into_function(fpioa::UARTHS_TX);
-    // let boot_button = Gpiohs::new(
-    //     gpiohs.gpiohs0, 
-    //     fpioa.io16.into_function(fpioa::GPIOHS0)
+    fpioa.io16.into_function(fpioa::GPIOHS0);
+    let boot_button = gpiohs.gpiohs0.into_pull_up_input();
+    // let boot_button = Gpio::new(
+    //     gpio.gpio0, 
+    //     fpioa.io16.into_function(fpioa::GPIO0)
     // ).into_pull_up_input();
-    let boot_button = Gpio::new(
-        gpio.gpio0, 
-        fpioa.io16.into_function(fpioa::GPIO0)
-    ).into_pull_up_input();
 
     // Configure UART
     let serial = p.UARTHS.configure(
