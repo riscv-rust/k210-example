@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac, plic::*, fpioa, gpiohs::Edge, stdout::Stdout};
+use k210_hal::{prelude::*, pac::{self, Interrupt}, plic::*, fpioa, gpiohs::Edge, stdout::Stdout};
 use panic_halt as _;
 use riscv::register::{mie,mstatus,mhartid,mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -32,15 +32,19 @@ fn my_trap_handler() {
     // actual handle process starts
     let stdout = unsafe { &mut *SHARED_STDOUT.as_mut_ptr() };
     let gpiohs0 = unsafe { &mut *GPIOHS0.as_mut_ptr() };
-    gpiohs0.clear_interrupt_pending_bits();
 
     let cause = mcause::read().bits();
 
-    writeln!(stdout, "Interrupt!!! {} {:016X}", hart_id, cause).unwrap();
+    writeln!(stdout, 
+        "[Interrupt] Hart #{}, Cause: {:016X}, Edges: {:?}", 
+        hart_id, cause, gpiohs0.check_edges()
+    ).ok();
 
     unsafe { INTR_INFO = Some(IntrInfo { hart_id, cause }); }
 
     INTR.store(true, Ordering::SeqCst);
+
+    gpiohs0.clear_interrupt_pending_bits();
     // actual handle process ends
 
     unsafe { 
@@ -77,9 +81,9 @@ fn main() -> ! {
 
     let mut stdout = Stdout(&mut tx);
 
-    writeln!(stdout, "This code is running on hart {}", mhartid::read()).unwrap();
+    writeln!(stdout, "This code is running on hart {}", mhartid::read()).ok();
 
-    writeln!(stdout, "Initializing interrupts").unwrap();
+    writeln!(stdout, "Initializing interrupts").ok();
     let hart_id = mhartid::read();
     unsafe {
         // set PLIC threshold for current core
@@ -90,20 +94,20 @@ fn main() -> ! {
         mie::set_mext();
     }
     
-    writeln!(stdout, "Enabling interrupt trigger for GPIOHS0").unwrap();
+    writeln!(stdout, "Enabling interrupt trigger for GPIOHS0").ok();
     boot.trigger_on_edge(Edge::RISING | Edge::FALLING);
 
     // enable IRQ for gpiohs0 interrupt 
-    writeln!(stdout, "Enabling IRQ for GPIOHS0").unwrap();
+    writeln!(stdout, "Enabling IRQ for GPIOHS0").ok();
     unsafe {
         pac::PLIC::set_priority(Interrupt::GPIOHS0, Priority::P1);
     }
     pac::PLIC::enable(hart_id, Interrupt::GPIOHS0);
 
-    writeln!(stdout, "Configuration finished!").unwrap();
+    writeln!(stdout, "Configuration finished!").ok();
 
     loop { 
-        writeln!(stdout, "Waiting for interrupt").unwrap();
+        writeln!(stdout, "Waiting for interrupt").ok();
         unsafe { riscv::asm::wfi(); } 
 
         while !INTR.load(Ordering::SeqCst) {
@@ -113,9 +117,9 @@ fn main() -> ! {
         INTR.store(false, Ordering::SeqCst);
 
         writeln!(stdout, 
-            "Interrupt was triggered! hart_id: {:16X}, cause: {:16X}", 
+            "Interrupt was triggered! hart_id: {}, cause: {:16X}", 
             unsafe { INTR_INFO }.unwrap().hart_id,
             unsafe { INTR_INFO }.unwrap().cause,
-        ).unwrap();
+        ).ok();
     }
 }
