@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac, plic::*, fpioa, stdout::Stdout, gpiohs::Gpiohs};
+use k210_hal::{prelude::*, pac, plic::*, fpioa, gpiohs::Edge, stdout::Stdout};
 use panic_halt as _;
 use riscv::register::{mie,mstatus,mhartid,mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
@@ -71,10 +71,8 @@ fn main() -> ! {
     let mut sysctl = p.SYSCTL.constrain();
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
     let gpiohs = p.GPIOHS.split();
-    let _boot = Gpiohs::new(
-        gpiohs.gpiohs0,
-        fpioa.io16.into_function(fpioa::GPIOHS0)
-    ).into_pull_up_input();
+    fpioa.io16.into_function(fpioa::GPIOHS0);
+    let mut boot = gpiohs.gpiohs0.into_pull_up_input();
 
     // Configure clocks (TODO)
     let clocks = k210_hal::clock::Clocks::new();
@@ -93,50 +91,13 @@ fn main() -> ! {
         pac::PLIC::set_threshold(hart_id, Priority::P0);
         // Enable interrupts in general
         mstatus::set_mie();
-        // // Set the Machine-Software bit in MIE
-        // mie::set_msoft();
         // Set the Machine-External bit in MIE
         mie::set_mext();
     }
-    // writeln!(stdout, "Initialize PLIC").unwrap();
-    // for reg_id in 1..((65 + 32) / 32) {
-    //     unsafe { 
-    //         (*pac::PLIC::ptr()).target_enables[hart_id].enable[reg_id]
-    //             .write(|w| w.bits(0));
-    //     }
-    // }
-    // for irq_number in 1..=65 {
-    //     unsafe { 
-    //         (*pac::PLIC::ptr()).priority[irq_number]
-    //             .write(|w| w.bits(0));
-    //     }
-    // }
-    // unsafe {
-    //     (*pac::PLIC::ptr()).targets[hart_id].threshold
-    //         .write(|w| w.bits(0));
-    // }
-    // loop {
-    //     let complete = pac::PLIC::claim(0);
-    //     writeln!(stdout, "Complete: {:?}", complete).ok();
-    //     if complete == None {
-    //         break;
-    //     }
-    // }
-    // enable both edge interrupt trigger for gpiohs0
+    
     writeln!(stdout, "Enabling interrupt trigger for GPIOHS0").unwrap();
-    unsafe {
-        &(*pac::GPIOHS::ptr()).rise_ie.write(|w| w.pin0().set_bit());
-        &(*pac::GPIOHS::ptr()).rise_ip.write(|w| w.pin0().set_bit());
+    boot.trigger_on_edge(Edge::RISING | Edge::FALLING);
 
-        &(*pac::GPIOHS::ptr()).fall_ie.write(|w| w.pin0().set_bit());
-        &(*pac::GPIOHS::ptr()).fall_ip.write(|w| w.pin0().set_bit());
-
-        &(*pac::GPIOHS::ptr()).low_ie.write(|w| w.pin0().clear_bit());
-        &(*pac::GPIOHS::ptr()).low_ip.write(|w| w.pin0().set_bit());
-
-        &(*pac::GPIOHS::ptr()).high_ie.write(|w| w.pin0().clear_bit());
-        &(*pac::GPIOHS::ptr()).high_ip.write(|w| w.pin0().set_bit());
-    }
     // enable IRQ for gpiohs0 interrupt 
     writeln!(stdout, "Enabling IRQ for GPIOHS0").unwrap();
     unsafe {
