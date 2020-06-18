@@ -101,8 +101,8 @@ fn main() -> ! {
     writeln!(stdout, "Enabling IRQ for GPIOHS0").ok();
     unsafe {
         pac::PLIC::set_priority(Interrupt::GPIOHS0, Priority::P1);
+        pac::PLIC::unmask(hart_id, Interrupt::GPIOHS0);
     }
-    pac::PLIC::enable(hart_id, Interrupt::GPIOHS0);
 
     writeln!(stdout, "Configuration finished!").ok();
 
