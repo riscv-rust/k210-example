@@ -14,7 +14,7 @@ fn main() -> ! {
     let io14 = fpioa.io14.into_function(fpioa::GPIO6);
     let mut blue = Gpio::new(gpio.gpio6, io14).into_push_pull_output();
 
-    blue.set_low().ok();
+    blue.try_set_low().ok();
 
     let mut last_update = riscv::register::mcycle::read();
     loop {
@@ -22,7 +22,7 @@ fn main() -> ! {
         if cur - last_update >= 100_000_000 {
             last_update = cur;
 
-            blue.toggle().ok();
+            blue.try_toggle().ok();
         }
     }
 }
