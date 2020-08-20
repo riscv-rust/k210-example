@@ -3,9 +3,9 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac, clint::{msip}, stdout::Stdout};
+use k210_hal::{prelude::*, pac, clint::msip, stdout::Stdout};
 use panic_halt as _;
-use riscv::register::{mie,mstatus,mhartid,mvendorid,marchid,mimpid,mcause};
+use riscv::register::{mie,mstatus,mhartid,/*mvendorid,marchid,mimpid,*/mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
 // use core::ptr;
 
@@ -32,7 +32,7 @@ fn my_trap_handler() {
 
     INTR.store(true, Ordering::SeqCst);
 
-    msip::set_value(hart_id, false);
+    msip::clear_ipi(hart_id);
 }
 
 #[riscv_rt::entry]
@@ -91,7 +91,7 @@ fn main() -> ! {
     }
 
     writeln!(stdout, "Generate IPI for core {} !", hart_id).unwrap();
-    msip::set_value(hart_id, true);
+    msip::set_ipi(hart_id);
 
     writeln!(stdout, "Waiting for interrupt").unwrap();
     while !INTR.load(Ordering::SeqCst) {
@@ -107,7 +107,7 @@ fn main() -> ! {
     if hart_id == 0 {
         writeln!(stdout, "Waking other harts...").unwrap();
         // wake hart 1
-        msip::set_value(1, true);
+        msip::set_ipi(1);
     }
 
     loop { unsafe { riscv::asm::wfi(); } }
@@ -124,7 +124,7 @@ pub extern "Rust" fn user_mp_hook() -> bool {
     } else {
 
         unsafe {
-            msip::set_value(hart_id, false);
+            msip::set_ipi(hart_id);
 
             // Start listening for software interrupts
             mie::set_msoft();
@@ -140,7 +140,7 @@ pub extern "Rust" fn user_mp_hook() -> bool {
             mie::clear_msoft();
 
             // Clear IPI
-            msip::set_value(hart_id, false);
+            msip::clear_ipi(hart_id);
         }
         false
     }
