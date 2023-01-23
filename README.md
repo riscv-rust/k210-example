@@ -4,6 +4,16 @@
 
 This project is developed and maintained by the [RISC-V team][team].
 
+## Building
+
+```
+rustup target add riscv64gc-unknown-none-elf
+rustup +nightly target add riscv64gc-unknown-none-elf
+
+cargo build --examples
+cargo +nightly build --examples # for examples with interrupts
+```
+
 ## Getting started
 
 Start openocd:
