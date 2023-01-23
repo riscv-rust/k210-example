@@ -6,6 +6,14 @@ edition = "2018"
 
 [dependencies]
 panic-halt = "0.2.0"
-riscv = "0.6.0"
-riscv-rt = "0.8.0"
-k210-hal = "0.2.0"
+riscv = "0.10"
+riscv-rt = "0.11"
+k210-pac = {git = "https://github.com/alexistm/k210-pac", branch = "upgrade/v0.10.0", features = ["critical"]}
+k210-hal = "0.2"
+embedded-hal = "0.2"
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"

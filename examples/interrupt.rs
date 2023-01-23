@@ -3,10 +3,10 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac, clint::msip, stdout::Stdout};
-use panic_halt as _;
-use riscv::register::{mie,mstatus,mhartid,/*mvendorid,marchid,mimpid,*/mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
+use k210_hal::{clint::msip, pac, prelude::*, stdout::Stdout};
+use panic_halt as _;
+use riscv::register::{/*mvendorid,marchid,mimpid,*/ mcause, mhartid, mie, mstatus};
 // use core::ptr;
 
 // fn peek<T>(addr: u64) -> T {
@@ -28,7 +28,9 @@ fn my_trap_handler() {
     let hart_id = mhartid::read();
     let cause = mcause::read().bits();
 
-    unsafe { INTR_INFO = Some(IntrInfo { hart_id, cause }); }
+    unsafe {
+        INTR_INFO = Some(IntrInfo { hart_id, cause });
+    }
 
     INTR.store(true, Ordering::SeqCst);
 
@@ -39,12 +41,10 @@ fn my_trap_handler() {
 fn main() -> ! {
     let hart_id = mhartid::read();
 
-    static mut SHARED_TX: Option<k210_hal::serial::Tx<
-        k210_hal::pac::UARTHS
-    >> = None;
+    static mut SHARED_TX: Option<k210_hal::serial::Tx<k210_hal::pac::UARTHS>> = None;
 
     if hart_id == 0 {
-        let p = pac::Peripherals::take().unwrap();
+        let p = unsafe { pac::Peripherals::steal() };
 
         //configure_fpioa(p.FPIOA);
 
@@ -61,9 +61,7 @@ fn main() -> ! {
     }
 
     // Super-unsafe UART sharing!
-    let tx = unsafe {
-        SHARED_TX.as_mut().unwrap()
-    };
+    let tx = unsafe { SHARED_TX.as_mut().unwrap() };
     let mut stdout = Stdout(tx);
 
     if hart_id == 1 {
@@ -94,15 +92,15 @@ fn main() -> ! {
     msip::set_ipi(hart_id);
 
     writeln!(stdout, "Waiting for interrupt").unwrap();
-    while !INTR.load(Ordering::SeqCst) {
-    }
+    while !INTR.load(Ordering::SeqCst) {}
     INTR.store(false, Ordering::SeqCst);
-    writeln!(stdout, 
-        "Interrupt was triggered! hart_id: {:16X}, cause: {:16X}", 
+    writeln!(
+        stdout,
+        "Interrupt was triggered! hart_id: {:16X}, cause: {:16X}",
         unsafe { INTR_INFO }.unwrap().hart_id,
         unsafe { INTR_INFO }.unwrap().cause,
-    ).unwrap();
-
+    )
+    .unwrap();
 
     if hart_id == 0 {
         writeln!(stdout, "Waking other harts...").unwrap();
@@ -110,19 +108,22 @@ fn main() -> ! {
         msip::set_ipi(1);
     }
 
-    loop { unsafe { riscv::asm::wfi(); } }
+    loop {
+        unsafe {
+            riscv::asm::wfi();
+        }
+    }
 }
 
 #[export_name = "_mp_hook"]
-pub extern "Rust" fn user_mp_hook() -> bool {
-    use riscv::register::/*{mie, */mip/*}*/;
+pub fn user_mp_hook() -> bool {
     use riscv::asm::wfi;
+    use riscv::register::mip; /*}*/;
 
     let hart_id = mhartid::read();
     if hart_id == 0 {
         true
     } else {
-
         unsafe {
             msip::set_ipi(hart_id);
 

@@ -1,10 +1,17 @@
 #![no_std]
 #![no_main]
 
-use k210_hal::{prelude::*, pac::{self, Interrupt}, plic::*, fpioa, gpiohs::Edge, stdout::Stdout};
-use panic_halt as _;
-use riscv::register::{mie,mstatus,mhartid,mcause};
 use core::sync::atomic::{AtomicBool, Ordering};
+use k210_hal::{
+    fpioa,
+    gpiohs::Edge,
+    pac::{self, Interrupt},
+    plic::*,
+    prelude::*,
+    stdout::Stdout,
+};
+use panic_halt as _;
+use riscv::register::{mcause, mhartid, mie, mstatus};
 
 static INTR: AtomicBool = AtomicBool::new(false);
 
@@ -23,7 +30,7 @@ fn my_trap_handler() {
 
     let irq = pac::PLIC::claim(hart_id).unwrap();
     let prio = pac::PLIC::get_priority(irq);
-    unsafe { 
+    unsafe {
         pac::PLIC::set_threshold(hart_id, prio);
         mie::clear_msoft();
         mie::clear_mtimer();
@@ -35,19 +42,25 @@ fn my_trap_handler() {
 
     let cause = mcause::read().bits();
 
-    writeln!(stdout, 
-        "[Interrupt] Hart #{}, Cause: {:016X}, Edges: {:?}", 
-        hart_id, cause, gpiohs0.check_edges()
-    ).ok();
+    writeln!(
+        stdout,
+        "[Interrupt] Hart #{}, Cause: {:016X}, Edges: {:?}",
+        hart_id,
+        cause,
+        gpiohs0.check_edges()
+    )
+    .ok();
 
-    unsafe { INTR_INFO = Some(IntrInfo { hart_id, cause }); }
+    unsafe {
+        INTR_INFO = Some(IntrInfo { hart_id, cause });
+    }
 
     INTR.store(true, Ordering::SeqCst);
 
     gpiohs0.clear_interrupt_pending_bits();
     // actual handle process ends
 
-    unsafe { 
+    unsafe {
         mie::set_msoft();
         mie::set_mtimer();
         pac::PLIC::set_threshold(hart_id, threshold);
@@ -56,15 +69,15 @@ fn my_trap_handler() {
 }
 
 static mut SHARED_STDOUT: core::mem::MaybeUninit<
-    k210_hal::stdout::Stdout<k210_hal::serial::Tx<pac::UARTHS>>
+    k210_hal::stdout::Stdout<k210_hal::serial::Tx<pac::UARTHS>>,
 > = core::mem::MaybeUninit::uninit();
 static mut GPIOHS0: core::mem::MaybeUninit<
-    k210_hal::gpiohs::Gpiohs0<k210_hal::gpiohs::Input<k210_hal::gpiohs::PullUp>>
+    k210_hal::gpiohs::Gpiohs0<k210_hal::gpiohs::Input<k210_hal::gpiohs::PullUp>>,
 > = core::mem::MaybeUninit::uninit();
 
 #[riscv_rt::entry]
 fn main() -> ! {
-    let p = pac::Peripherals::take().unwrap();
+    let p = unsafe { pac::Peripherals::steal() };
 
     let mut sysctl = p.SYSCTL.constrain();
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
@@ -93,11 +106,11 @@ fn main() -> ! {
         // Set the Machine-External bit in MIE
         mie::set_mext();
     }
-    
+
     writeln!(stdout, "Enabling interrupt trigger for GPIOHS0").ok();
     boot.trigger_on_edge(Edge::RISING | Edge::FALLING);
 
-    // enable IRQ for gpiohs0 interrupt 
+    // enable IRQ for gpiohs0 interrupt
     writeln!(stdout, "Enabling IRQ for GPIOHS0").ok();
     unsafe {
         pac::PLIC::set_priority(Interrupt::GPIOHS0, Priority::P1);
@@ -106,9 +119,11 @@ fn main() -> ! {
 
     writeln!(stdout, "Configuration finished!").ok();
 
-    loop { 
+    loop {
         writeln!(stdout, "Waiting for interrupt").ok();
-        unsafe { riscv::asm::wfi(); } 
+        unsafe {
+            riscv::asm::wfi();
+        }
 
         while !INTR.load(Ordering::SeqCst) {
             use core::sync::atomic::{self, Ordering};
@@ -116,10 +131,12 @@ fn main() -> ! {
         }
         INTR.store(false, Ordering::SeqCst);
 
-        writeln!(stdout, 
-            "Interrupt was triggered! hart_id: {}, cause: {:16X}", 
+        writeln!(
+            stdout,
+            "Interrupt was triggered! hart_id: {}, cause: {:16X}",
             unsafe { INTR_INFO }.unwrap().hart_id,
             unsafe { INTR_INFO }.unwrap().cause,
-        ).ok();
+        )
+        .ok();
     }
 }
