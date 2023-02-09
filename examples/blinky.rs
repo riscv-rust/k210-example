@@ -13,6 +13,7 @@ fn main() -> ! {
     let mut sysctl = p.SYSCTL.constrain();
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
     let gpio = p.GPIO.split(&mut sysctl.apb0);
+
     let io12 = fpioa.io12.into_function(fpioa::GPIO7);
     let io13 = fpioa.io13.into_function(fpioa::GPIO5);
     let io14 = fpioa.io14.into_function(fpioa::GPIO6);
@@ -33,10 +34,10 @@ fn main() -> ! {
 
             red.toggle().unwrap();
             if i % 2 == 0 {
-              green.toggle().unwrap();
+                green.toggle().unwrap();
             }
             if i % 3 == 0 {
-              blue.toggle().unwrap();
+                blue.toggle().unwrap();
             }
 
             i += 1;

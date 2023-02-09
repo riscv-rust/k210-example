@@ -4,7 +4,7 @@
 
 [target.riscv64gc-unknown-none-elf]
 #runner = "riscv64-unknown-elf-gdb -x gdb_init"
-runner = "../k210-run --flash"
+runner = "bash ../k210-run.sh --flash"
 rustflags = [
   "-C", "link-arg=-Tmemory.x",
   "-C", "link-arg=-Tlink.x",

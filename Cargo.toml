@@ -9,7 +9,8 @@ panic-halt = "0.2.0"
 riscv = "0.10"
 riscv-rt = "0.11"
 k210-pac = {git = "https://github.com/alexistm/k210-pac", branch = "feature/svd_0_28_0", features = ["critical"]}
-k210-hal = "0.2"
+k210-hal = {path = "../k210-hal"}
+# k210-hal = {git = "https://github.com/alexistm/k210-hal", branch = "feature/svd_0_28_0"}
 embedded-hal = "0.2"
 
 [profile.dev]

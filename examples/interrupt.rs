@@ -118,7 +118,7 @@ fn main() -> ! {
 #[export_name = "_mp_hook"]
 pub fn user_mp_hook() -> bool {
     use riscv::asm::wfi;
-    use riscv::register::mip;    /*}*/
+    use riscv::register::mip; /*}*/
 
     let hart_id = mhartid::read();
     if hart_id == 0 {
