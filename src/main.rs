@@ -2,15 +2,16 @@
 #![no_std]
 #![no_main]
 
-use panic_halt as _;
-use k210_hal::prelude::*;
 use k210_hal::fpioa;
-use k210_hal::pac as pac;
+use k210_hal::pac;
+use k210_hal::prelude::*;
 use k210_hal::stdout::Stdout;
+use panic_halt as _;
+use riscv_rt;
 
 #[riscv_rt::entry]
 fn main() -> ! {
-    let p = pac::Peripherals::take().unwrap();
+    let p = unsafe { pac::Peripherals::steal() };
     let mut sysctl = p.SYSCTL.constrain();
     // Prepare pins for UARTHS
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
@@ -20,10 +21,7 @@ fn main() -> ! {
     let clocks = k210_hal::clock::Clocks::new();
 
     // Configure UART
-    let serial = p.UARTHS.configure(
-        115_200.bps(), 
-        &clocks
-    );
+    let serial = p.UARTHS.configure(115_200.bps(), &clocks);
     let (mut tx, _) = serial.split();
 
     // todo: new stdout design (simple Write impl?)

@@ -1,21 +1,23 @@
 #![no_std]
 #![no_main]
 
+use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::v2::ToggleableOutputPin;
+use k210_hal::{fpioa, gpio::Gpio, pac, prelude::*};
 use panic_halt as _;
-use k210_hal::{prelude::*, fpioa, pac, gpio::Gpio};
 
 #[riscv_rt::entry]
 fn main() -> ! {
     // todo
-    let p = pac::Peripherals::take().unwrap();
-    
+    let p = unsafe { pac::Peripherals::steal() };
+
     let mut sysctl = p.SYSCTL.constrain();
     let fpioa = p.FPIOA.split(&mut sysctl.apb0);
     let gpio = p.GPIO.split(&mut sysctl.apb0);
     let io14 = fpioa.io14.into_function(fpioa::GPIO6);
     let mut blue = Gpio::new(gpio.gpio6, io14).into_push_pull_output();
 
-    blue.try_set_low().ok();
+    blue.set_low().unwrap();
 
     let mut last_update = riscv::register::mcycle::read();
     loop {
@@ -23,7 +25,7 @@ fn main() -> ! {
         if cur - last_update >= 100_000_000 {
             last_update = cur;
 
-            blue.try_toggle().ok();
+            blue.toggle().unwrap();
         }
     }
 }

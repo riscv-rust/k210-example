@@ -3,17 +3,17 @@
 
 extern crate panic_halt;
 
+use k210_hal::pac::{Peripherals, CLINT, UARTHS};
+use k210_hal::prelude::*;
+use k210_hal::serial::Tx;
+use k210_hal::stdout::Stdout;
 use riscv::register::mhartid;
 use riscv_rt::entry;
-use k210_hal::prelude::*;
-use k210_hal::pac::{Peripherals, UARTHS, CLINT};
-use k210_hal::stdout::Stdout;
-use k210_hal::serial::Tx;
 
 #[export_name = "_mp_hook"]
-pub extern "Rust" fn user_mp_hook() -> bool {
-    use riscv::register::{mie, mip};
+pub fn user_mp_hook() -> bool {
     use riscv::asm::wfi;
+    use riscv::register::{mie, mip};
 
     let hartid = mhartid::read();
     if hartid == 0 {
@@ -53,7 +53,6 @@ pub fn wake_hart(hartid: usize) {
     }
 }
 
-
 #[entry]
 fn main() -> ! {
     let hartid = mhartid::read();
@@ -61,7 +60,7 @@ fn main() -> ! {
     static mut SHARED_TX: Option<Tx<UARTHS>> = None;
 
     if hartid == 0 {
-        let p = Peripherals::take().unwrap();
+        let p = unsafe { Peripherals::steal() };
 
         //configure_fpioa(p.FPIOA);
 
@@ -78,9 +77,7 @@ fn main() -> ! {
     }
 
     // Super-unsafe UART sharing!
-    let tx = unsafe {
-        SHARED_TX.as_mut().unwrap()
-    };
+    let tx = unsafe { SHARED_TX.as_mut().unwrap() };
     let mut stdout = Stdout(tx);
 
     if hartid == 1 {
@@ -96,5 +93,5 @@ fn main() -> ! {
         wake_hart(1);
     }
 
-    loop { }
+    loop {}
 }
